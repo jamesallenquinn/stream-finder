@@ -403,11 +403,12 @@ const LS = {
 };
 const IMG = 'https://image.tmdb.org/t/p/';
 const DAY_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_KEY = '06d1e2d05d78c94a873b19322df6f2e6';   // built-in key so devices need no setup
 
 const $ = id => document.getElementById(id);
 
 const state = {
-  key: localStorage.getItem(LS.key) || '',
+  key: localStorage.getItem(LS.key) || DEFAULT_KEY,
   demo: localStorage.getItem(LS.demo) === '1',
   region: localStorage.getItem(LS.region) || 'US',
   recents: loadRecents()
