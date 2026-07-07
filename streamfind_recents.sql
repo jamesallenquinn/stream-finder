@@ -25,3 +25,7 @@ drop policy if exists "streamfind update" on public.streamfind_recents;
 create policy "streamfind read"   on public.streamfind_recents for select using (true);
 create policy "streamfind insert" on public.streamfind_recents for insert with check (true);
 create policy "streamfind update" on public.streamfind_recents for update using (true) with check (true);
+
+-- This project has hardened defaults (no automatic grants), so the anon role
+-- needs explicit table privileges on top of the RLS policies.
+grant select, insert, update on public.streamfind_recents to anon;
