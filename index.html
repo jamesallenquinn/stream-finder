@@ -344,6 +344,12 @@
     </div>
 
     <div class="field">
+      <label for="syncCode">Household sync code</label>
+      <input type="text" id="syncCode" placeholder="Leave blank to keep this device separate" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <p style="font-size:.82rem; color:var(--ink-2); margin-top:8px;">Devices using the same code share one Recents list (adds, deletes, and daily updates sync automatically).</p>
+    </div>
+
+    <div class="field">
       <label for="settingsKey">TMDB API Key</label>
       <input type="text" id="settingsKey" placeholder="Paste API key (leave blank for demo mode)" autocomplete="off" autocapitalize="off" spellcheck="false">
     </div>
@@ -399,19 +405,30 @@ const LS = {
   demo:   'sf_demo_mode',
   region: 'sf_region',
   size:   'sf_text_size',
-  recents:'sf_recents'
+  recents:'sf_recents',
+  sync:   'sf_sync_code',
+  deleted:'sf_deleted'
 };
 const IMG = 'https://image.tmdb.org/t/p/';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_KEY = '06d1e2d05d78c94a873b19322df6f2e6';   // built-in key so devices need no setup
 
+/* household sync — shared recents row in Supabase (streamfind_recents table).
+   All devices with the same sync code read/write one row. */
+const SB_URL = 'https://aebghirpjiwiergkafej.supabase.co';
+const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFlYmdoaXJwaml3aWVyZ2thZmVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMjA0NTQsImV4cCI6MjA5NTg5NjQ1NH0.ogDc26YGo3AEAZZcPII_p3htPml4pjQa4vOyYAU1sSg';
+const DEFAULT_SYNC_CODE = 'quinn-hh-7g4kq';
+
 const $ = id => document.getElementById(id);
 
+const storedSync = localStorage.getItem(LS.sync);
 const state = {
   key: localStorage.getItem(LS.key) || DEFAULT_KEY,
   demo: localStorage.getItem(LS.demo) === '1',
   region: localStorage.getItem(LS.region) || 'US',
-  recents: loadRecents()
+  recents: loadRecents(),
+  syncCode: storedSync === null ? DEFAULT_SYNC_CODE : storedSync.trim(),
+  deleted: loadDeleted()          // tombstones: "type:id" -> deletion timestamp
 };
 
 function loadRecents(){
@@ -419,6 +436,12 @@ function loadRecents(){
   catch(e){ return []; }
 }
 function saveRecents(){ localStorage.setItem(LS.recents, JSON.stringify(state.recents)); }
+function loadDeleted(){
+  try{ return JSON.parse(localStorage.getItem(LS.deleted)) || {}; }
+  catch(e){ return {}; }
+}
+function saveDeleted(){ localStorage.setItem(LS.deleted, JSON.stringify(state.deleted)); }
+function itemKey(x){ return x.media_type + ':' + x.id; }
 
 /* ---------------- demo catalog ---------------- */
 const DEMO = [
@@ -664,24 +687,34 @@ function addRecent(r, prov){
   state.recents.unshift({
     id: r.id, media_type: r.media_type, title: r.title, year: r.year,
     poster: r.poster, emoji: r.emoji,
-    providers: prov, checked: Date.now()
+    providers: prov, checked: Date.now(), added: Date.now()
   });
   if (state.recents.length > 50) state.recents.length = 50;
+  delete state.deleted[itemKey(r)];
+  saveDeleted();
   saveRecents();
   renderRecents();
+  schedulePush();
 }
 
 function removeRecent(id, mediaType){
   state.recents = state.recents.filter(x => !(x.id === id && x.media_type === mediaType));
+  state.deleted[mediaType + ':' + id] = Date.now();
+  saveDeleted();
   saveRecents();
   renderRecents();
+  schedulePush();
   toast('Removed from recents');
 }
 
 $('clearRecents').addEventListener('click', () => {
+  const now = Date.now();
+  state.recents.forEach(x => { state.deleted[itemKey(x)] = now; });
   state.recents = [];
+  saveDeleted();
   saveRecents();
   renderRecents();
+  schedulePush();
   toast('Recents cleared');
 });
 
@@ -761,8 +794,97 @@ async function refreshStale(){
   }
   saveRecents();
   renderRecents();
+  schedulePush();
   toast(changed ? `Updated — ${changed} title(s) changed services` : 'All recents up to date ✓');
 }
+
+/* ---------------- household sync ---------------- */
+const SB_HEADERS = { apikey: SB_ANON, Authorization: 'Bearer ' + SB_ANON, 'Content-Type': 'application/json' };
+
+let pushTimer = null, lastSyncAt = 0;
+function schedulePush(){
+  if (!state.syncCode) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(pushRemote, 1200);
+}
+
+async function pushRemote(){
+  if (!state.syncCode) return;
+  try{
+    await fetch(`${SB_URL}/rest/v1/streamfind_recents`, {
+      method: 'POST',
+      headers: { ...SB_HEADERS, Prefer: 'resolution=merge-duplicates' },
+      body: JSON.stringify({
+        code: state.syncCode,
+        data: { items: state.recents, deleted: state.deleted },
+        updated_at: new Date().toISOString()
+      })
+    });
+  }catch(e){ /* offline — next change or app open retries */ }
+}
+
+async function fetchRemote(){
+  const res = await fetch(
+    `${SB_URL}/rest/v1/streamfind_recents?code=eq.${encodeURIComponent(state.syncCode)}&select=data`,
+    { headers: SB_HEADERS });
+  if (!res.ok) throw new Error('sync fetch ' + res.status);   // incl. table-missing — sync just skips
+  const rows = await res.json();
+  return rows.length ? rows[0].data : null;                   // no shared row yet
+}
+
+function mergeRemote(remote){
+  if (!remote) return false;
+  const before = JSON.stringify(state.recents.map(itemKey));
+
+  // union tombstones, newest deletion wins
+  for (const [k, ts] of Object.entries(remote.deleted || {})){
+    if (!state.deleted[k] || ts > state.deleted[k]) state.deleted[k] = ts;
+  }
+  // union items by key; the copy with fresher provider data wins
+  const map = new Map();
+  for (const it of [...state.recents, ...(remote.items || [])]){
+    const k = itemKey(it);
+    const cur = map.get(k);
+    if (!cur) map.set(k, { ...it });
+    else {
+      const win = (it.checked || 0) > (cur.checked || 0) ? it : cur;
+      map.set(k, { ...win, added: Math.max(it.added || 0, cur.added || 0) });
+    }
+  }
+  // an item survives a tombstone only if it was (re-)added after the deletion
+  state.recents = [...map.values()].filter(it => {
+    const delTs = state.deleted[itemKey(it)];
+    return !delTs || (it.added || 0) > delTs;
+  });
+  state.recents.sort((a, b) => (b.added || b.checked || 0) - (a.added || a.checked || 0));
+  if (state.recents.length > 50) state.recents.length = 50;
+
+  // prune tombstones older than 60 days
+  const cutoff = Date.now() - 60 * DAY_MS;
+  for (const k of Object.keys(state.deleted)) if (state.deleted[k] < cutoff) delete state.deleted[k];
+
+  saveRecents();
+  saveDeleted();
+  return before !== JSON.stringify(state.recents.map(itemKey));
+}
+
+async function syncNow(){
+  if (!state.syncCode) return;
+  try{
+    const remote = await fetchRemote();
+    const changed = mergeRemote(remote);
+    lastSyncAt = Date.now();
+    if (changed){ renderRecents(); toast('Recents synced across devices'); }
+    schedulePush();                                    // publish merged view
+  }catch(e){ /* offline — recents stay local until next open */ }
+}
+
+// re-sync when the app returns to the foreground (home-screen apps on iOS)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && configured() && Date.now() - lastSyncAt > 5 * 60000){
+    syncNow().then(refreshStale);
+  }
+});
 
 /* ---------------- setup & settings ---------------- */
 $('setupSave').addEventListener('click', () => {
@@ -784,6 +906,7 @@ $('settingsBtn').addEventListener('click', () => {
   if (!configured()) return;
   $('settingsKey').value = state.key;
   $('regionSel').value = state.region;
+  $('syncCode').value = state.syncCode;
   show('settings');
 });
 $('settingsClose').addEventListener('click', () => show(configured() ? 'main' : 'setup'));
@@ -792,19 +915,24 @@ $('settingsSave').addEventListener('click', () => {
   state.key = k;
   state.demo = !k;
   state.region = $('regionSel').value;
+  const newCode = $('syncCode').value.trim();
+  const codeChanged = newCode !== state.syncCode;
+  state.syncCode = newCode;
   localStorage.setItem(LS.key, k);
   localStorage.setItem(LS.demo, state.demo ? '1' : '0');
   localStorage.setItem(LS.region, state.region);
+  localStorage.setItem(LS.sync, state.syncCode);
   $('regionTag').textContent = 'Where to watch · ' + state.region + (state.demo ? ' · demo' : '');
   toast('Settings saved');
   show('main');
+  if (codeChanged && state.syncCode) syncNow();
 });
 
 function enterMain(){
   $('regionTag').textContent = 'Where to watch · ' + state.region + (state.demo ? ' · demo' : '');
   show('main');
-  renderRecents();
-  refreshStale();
+  renderRecents();                       // instant paint from local copy
+  syncNow().then(refreshStale);          // then merge shared list, then daily re-check
 }
 
 /* ---------------- boot ---------------- */
