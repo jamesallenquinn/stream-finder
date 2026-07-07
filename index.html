@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="StreamFind">
+<meta name="theme-color" content="#4f46e5">
+<title>StreamFind — Where to Watch</title>
+<style>
+  :root{
+    --bg:#f4f5fb;
+    --card:#ffffff;
+    --ink:#1a1d29;
+    --ink-2:#5a5f73;
+    --ink-3:#9096ab;
+    --accent:#4f46e5;
+    --accent-soft:#eef0ff;
+    --green:#0e9f6e;
+    --green-soft:#e6f7f0;
+    --amber:#b45309;
+    --amber-soft:#fdf3e3;
+    --red:#dc2626;
+    --line:#e6e8f2;
+    --radius:20px;
+    --shadow:0 2px 6px rgba(26,29,41,.05), 0 12px 32px rgba(26,29,41,.07);
+    --tap:48px;
+    font-size:17px;
+  }
+  html.size-large{ font-size:21px; --tap:56px; }
+  html.size-xl{ font-size:26px; --tap:64px; }
+
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{
+    font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  button{ font:inherit; color:inherit; background:none; border:none; cursor:pointer; }
+  input{ font:inherit; }
+  img{ display:block; }
+
+  .shell{ max-width:820px; margin:0 auto; padding:0 20px 56px; }
+
+  /* ---------- header ---------- */
+  header{
+    position:sticky; top:0; z-index:40;
+    background:linear-gradient(135deg,#4f46e5,#7c3aed);
+    color:#fff;
+    padding-top:env(safe-area-inset-top);
+    box-shadow:0 6px 24px rgba(79,70,229,.28);
+  }
+  .header-inner{
+    max-width:820px; margin:0 auto;
+    display:flex; align-items:center; gap:12px;
+    padding:14px 20px;
+  }
+  .logo{ display:flex; align-items:center; gap:10px; flex:1; min-width:0; }
+  .logo-badge{
+    width:2.1rem; height:2.1rem; border-radius:12px; flex:none;
+    background:rgba(255,255,255,.18);
+    display:grid; place-items:center; font-size:1.15rem;
+  }
+  .logo h1{ font-size:1.25rem; font-weight:800; letter-spacing:-.02em; white-space:nowrap; }
+  .logo small{ display:block; font-size:.72rem; font-weight:500; opacity:.85; letter-spacing:.02em; }
+  .hbtn{
+    min-width:var(--tap); min-height:var(--tap);
+    border-radius:14px; background:rgba(255,255,255,.16);
+    display:grid; place-items:center;
+    font-weight:700; font-size:.95rem; padding:0 12px;
+  }
+  .hbtn:active{ background:rgba(255,255,255,.3); }
+
+  /* ---------- search ---------- */
+  .search-wrap{ position:relative; margin-top:22px; z-index:30; }
+  .search-box{
+    display:flex; align-items:center; gap:12px;
+    background:var(--card); border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:0 18px;
+    border:2px solid transparent;
+    transition:border-color .15s;
+  }
+  .search-box:focus-within{ border-color:var(--accent); }
+  .search-box .icon{ font-size:1.2rem; color:var(--ink-3); flex:none; }
+  #searchInput{
+    flex:1; border:none; outline:none; background:none;
+    min-height:calc(var(--tap) + 10px);
+    font-size:1.06rem; color:var(--ink); min-width:0;
+  }
+  #searchInput::placeholder{ color:var(--ink-3); }
+  #clearBtn{
+    flex:none; width:2rem; height:2rem; border-radius:50%;
+    background:var(--line); color:var(--ink-2);
+    font-size:.95rem; font-weight:700; display:none;
+  }
+  .search-box.has-text #clearBtn{ display:grid; place-items:center; }
+
+  /* suggestions dropdown */
+  #suggestions{
+    position:absolute; left:0; right:0; top:calc(100% + 8px);
+    background:var(--card); border-radius:var(--radius);
+    box-shadow:0 18px 48px rgba(26,29,41,.18);
+    overflow:hidden; display:none;
+    max-height:26rem; overflow-y:auto;
+  }
+  #suggestions.open{ display:block; }
+  .sug{
+    display:flex; align-items:center; gap:14px; width:100%;
+    padding:10px 16px; text-align:left;
+    min-height:var(--tap);
+    border-bottom:1px solid var(--line);
+  }
+  .sug:last-child{ border-bottom:none; }
+  .sug:active{ background:var(--accent-soft); }
+  .sug img, .sug .noposter{
+    width:2.6rem; height:3.9rem; border-radius:8px; object-fit:cover; flex:none;
+    background:var(--line);
+  }
+  .sug .noposter{ display:grid; place-items:center; font-size:1.2rem; color:var(--ink-3); }
+  .sug .s-main{ flex:1; min-width:0; }
+  .sug .s-title{ font-weight:700; font-size:1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sug .s-sub{ font-size:.85rem; color:var(--ink-2); margin-top:2px; }
+  .badge{
+    display:inline-block; font-size:.68rem; font-weight:800; letter-spacing:.04em;
+    padding:3px 8px; border-radius:99px; text-transform:uppercase;
+  }
+  .badge.tv{ background:#e5f3ff; color:#0369a1; }
+  .badge.movie{ background:#fdeef3; color:#be185d; }
+
+  /* ---------- section headings ---------- */
+  h2.section{
+    font-size:.95rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--ink-2); margin:34px 0 14px; display:flex; align-items:center; gap:10px;
+  }
+  h2.section .count{
+    background:var(--line); color:var(--ink-2);
+    border-radius:99px; padding:2px 10px; font-size:.8rem;
+  }
+
+  /* ---------- result card ---------- */
+  .result-card{
+    background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow);
+    padding:22px; display:none; margin-top:26px;
+    animation:pop .25s ease;
+  }
+  .result-card.open{ display:block; }
+  @keyframes pop{ from{ opacity:0; transform:translateY(10px);} to{ opacity:1; transform:none;} }
+  .r-top{ display:flex; gap:18px; }
+  .r-poster{
+    width:6.2rem; border-radius:14px; flex:none; aspect-ratio:2/3; object-fit:cover;
+    background:var(--line); box-shadow:0 6px 18px rgba(26,29,41,.18);
+  }
+  .r-info{ flex:1; min-width:0; }
+  .r-title{ font-size:1.35rem; font-weight:800; letter-spacing:-.01em; line-height:1.2; }
+  .r-meta{ color:var(--ink-2); font-size:.95rem; margin-top:6px; }
+  .r-close{
+    float:right; width:2.2rem; height:2.2rem; border-radius:50%;
+    background:var(--line); color:var(--ink-2); font-size:1rem; font-weight:700;
+    margin-left:10px;
+  }
+  .status-pill{
+    display:inline-flex; align-items:center; gap:8px;
+    font-weight:800; font-size:.92rem;
+    border-radius:99px; padding:8px 14px; margin-top:12px;
+  }
+  .status-pill .dot{ width:.6rem; height:.6rem; border-radius:50%; }
+  .status-pill.yes{ background:var(--green-soft); color:var(--green); }
+  .status-pill.yes .dot{ background:var(--green); }
+  .status-pill.no{ background:var(--amber-soft); color:var(--amber); }
+  .status-pill.no .dot{ background:var(--amber); }
+
+  .prov-group{ margin-top:18px; }
+  .prov-label{ font-size:.85rem; font-weight:800; color:var(--ink-2); text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px; }
+  .prov-row{ display:flex; flex-wrap:wrap; gap:10px; }
+  .prov{
+    display:flex; align-items:center; gap:10px;
+    background:var(--accent-soft); border-radius:14px;
+    padding:8px 14px 8px 8px; min-height:var(--tap);
+  }
+  .prov img{ width:2rem; height:2rem; border-radius:9px; }
+  .prov span{ font-weight:700; font-size:.95rem; }
+  .prov.secondary{ background:var(--bg); }
+  .attrib{ margin-top:18px; font-size:.72rem; color:var(--ink-3); }
+
+  /* ---------- recents ---------- */
+  #recentsEmpty{
+    background:var(--card); border:2px dashed var(--line); border-radius:var(--radius);
+    padding:34px 24px; text-align:center; color:var(--ink-2);
+  }
+  #recentsEmpty .big{ font-size:2rem; margin-bottom:10px; }
+  #recentsList{ display:grid; grid-template-columns:1fr; gap:14px; }
+  @media(min-width:640px){ #recentsList{ grid-template-columns:1fr 1fr; } }
+  .recent{
+    background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow);
+    padding:14px; display:flex; gap:14px; align-items:center;
+    text-align:left; width:100%;
+  }
+  .recent:active{ transform:scale(.985); }
+  .recent img.poster, .recent .noposter{
+    width:3.4rem; height:5.1rem; border-radius:10px; object-fit:cover; flex:none; background:var(--line);
+  }
+  .recent .noposter{ display:grid; place-items:center; font-size:1.4rem; color:var(--ink-3); }
+  .rc-main{ flex:1; min-width:0; }
+  .rc-title{ font-weight:800; font-size:1.02rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rc-status{ display:flex; align-items:center; gap:7px; margin-top:6px; font-size:.85rem; font-weight:700; }
+  .rc-status .dot{ width:.55rem; height:.55rem; border-radius:50%; flex:none; }
+  .rc-status.yes{ color:var(--green); } .rc-status.yes .dot{ background:var(--green); }
+  .rc-status.no{ color:var(--amber); } .rc-status.no .dot{ background:var(--amber); }
+  .rc-logos{ display:flex; gap:6px; margin-top:8px; }
+  .rc-logos img{ width:1.7rem; height:1.7rem; border-radius:7px; }
+  .rc-logos .more{ font-size:.78rem; color:var(--ink-2); font-weight:700; align-self:center; }
+  .rc-checked{ font-size:.72rem; color:var(--ink-3); margin-top:6px; }
+  .rc-del{
+    flex:none; width:var(--tap); height:var(--tap); border-radius:14px;
+    background:var(--bg); color:var(--red); font-size:1.15rem;
+    display:grid; place-items:center;
+  }
+  .rc-del:active{ background:#fee2e2; }
+
+  /* ---------- setup / settings ---------- */
+  .panel{
+    background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow);
+    padding:26px; margin-top:26px;
+  }
+  .panel h2{ font-size:1.3rem; font-weight:800; margin-bottom:8px; letter-spacing:-.01em; }
+  .panel p{ color:var(--ink-2); line-height:1.55; margin-bottom:14px; }
+  .panel p a{ color:var(--accent); font-weight:700; }
+  .field{ margin:16px 0; }
+  .field label{ display:block; font-weight:700; font-size:.92rem; margin-bottom:8px; }
+  .field input[type=text], .field select{
+    width:100%; border:2px solid var(--line); border-radius:14px;
+    padding:0 14px; min-height:var(--tap); font-size:1rem; background:#fff;
+    outline:none; color:var(--ink);
+  }
+  .field input:focus, .field select:focus{ border-color:var(--accent); }
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    min-height:var(--tap); padding:0 22px; border-radius:16px;
+    font-weight:800; font-size:1rem;
+  }
+  .btn.primary{ background:var(--accent); color:#fff; box-shadow:0 8px 20px rgba(79,70,229,.3); }
+  .btn.primary:active{ transform:scale(.97); }
+  .btn.ghost{ background:var(--accent-soft); color:var(--accent); }
+  .btn.danger{ background:#fee2e2; color:var(--red); }
+  .btn-row{ display:flex; gap:12px; flex-wrap:wrap; margin-top:6px; }
+  .divider{ height:1px; background:var(--line); margin:22px 0; }
+
+  .seg{ display:flex; background:var(--bg); border-radius:14px; padding:4px; gap:4px; }
+  .seg button{
+    flex:1; min-height:calc(var(--tap) - 8px); border-radius:11px; font-weight:700; font-size:.95rem;
+    color:var(--ink-2);
+  }
+  .seg button.on{ background:#fff; color:var(--ink); box-shadow:0 2px 8px rgba(26,29,41,.12); }
+
+  .toast{
+    position:fixed; left:50%; bottom:calc(28px + env(safe-area-inset-bottom));
+    transform:translateX(-50%) translateY(20px);
+    background:var(--ink); color:#fff; font-weight:700; font-size:.95rem;
+    padding:13px 22px; border-radius:99px; opacity:0; pointer-events:none;
+    transition:.25s; z-index:80; max-width:88vw; text-align:center;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%); }
+
+  .spinner{
+    width:1.3rem; height:1.3rem; border-radius:50%;
+    border:3px solid var(--line); border-top-color:var(--accent);
+    animation:spin .7s linear infinite; margin:0 auto;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg);} }
+  .hidden{ display:none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-badge">📺</div>
+      <div>
+        <h1>StreamFind</h1>
+        <small id="regionTag">Where to watch · US</small>
+      </div>
+    </div>
+    <button class="hbtn" id="sizeBtn" aria-label="Text size" title="Text size">Aa</button>
+    <button class="hbtn" id="settingsBtn" aria-label="Settings" title="Settings">⚙︎</button>
+  </div>
+</header>
+
+<div class="shell">
+
+  <!-- ============ SETUP ============ -->
+  <section id="setupView" class="panel hidden">
+    <h2>Welcome to StreamFind 👋</h2>
+    <p>Search any movie or TV show and instantly see which streaming services carry it — powered by live data from TMDB &amp; JustWatch.</p>
+    <p>To use live data, paste a <strong>free TMDB API key</strong> below.
+       Get one in about 2 minutes at <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">themoviedb.org/settings/api</a> (create a free account → request an API key → copy “API Key”).</p>
+    <div class="field">
+      <label for="setupKey">TMDB API Key</label>
+      <input type="text" id="setupKey" placeholder="Paste your API key here" autocomplete="off" autocapitalize="off" spellcheck="false">
+    </div>
+    <div class="btn-row">
+      <button class="btn primary" id="setupSave">Save &amp; Start</button>
+      <button class="btn ghost" id="setupDemo">Try Demo Mode</button>
+    </div>
+    <p style="margin-top:16px; font-size:.85rem;">Demo mode uses a small built-in sample catalog so you can explore the app without a key.</p>
+  </section>
+
+  <!-- ============ SETTINGS ============ -->
+  <section id="settingsView" class="panel hidden">
+    <h2>Settings</h2>
+
+    <div class="field">
+      <label>Text size (great for iPad / easier reading)</label>
+      <div class="seg" id="sizeSeg">
+        <button data-size="std">Standard</button>
+        <button data-size="large">Large</button>
+        <button data-size="xl">Extra Large</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="regionSel">Country / region for streaming results</label>
+      <select id="regionSel">
+        <option value="US">United States</option>
+        <option value="CA">Canada</option>
+        <option value="GB">United Kingdom</option>
+        <option value="AU">Australia</option>
+        <option value="IE">Ireland</option>
+        <option value="NZ">New Zealand</option>
+        <option value="MX">Mexico</option>
+        <option value="DE">Germany</option>
+        <option value="FR">France</option>
+        <option value="ES">Spain</option>
+        <option value="IT">Italy</option>
+        <option value="BR">Brazil</option>
+        <option value="IN">India</option>
+        <option value="JP">Japan</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="settingsKey">TMDB API Key</label>
+      <input type="text" id="settingsKey" placeholder="Paste API key (leave blank for demo mode)" autocomplete="off" autocapitalize="off" spellcheck="false">
+    </div>
+
+    <div class="btn-row">
+      <button class="btn primary" id="settingsSave">Save</button>
+      <button class="btn ghost" id="settingsClose">Close</button>
+    </div>
+    <div class="divider"></div>
+    <div class="btn-row">
+      <button class="btn danger" id="clearRecents">Clear all recents</button>
+    </div>
+    <p class="attrib" style="margin-top:18px;">Streaming availability data by JustWatch via TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+  </section>
+
+  <!-- ============ MAIN ============ -->
+  <section id="mainView" class="hidden">
+    <div class="search-wrap">
+      <div class="search-box" id="searchBox">
+        <span class="icon">🔍</span>
+        <input id="searchInput" type="text" placeholder="Search a movie or TV show…"
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+               aria-label="Search a movie or TV show">
+        <button id="clearBtn" aria-label="Clear search">✕</button>
+      </div>
+      <div id="suggestions" role="listbox" aria-label="Search suggestions"></div>
+    </div>
+
+    <div class="result-card" id="resultCard"></div>
+
+    <h2 class="section">Recents <span class="count" id="recentsCount">0</span></h2>
+    <div id="recentsEmpty">
+      <div class="big">🍿</div>
+      <strong>Nothing here yet.</strong><br>
+      Search for a show or movie above — everything you look up is saved here and re-checked daily so you always know where it’s streaming.
+    </div>
+    <div id="recentsList"></div>
+  </section>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* =============================================================
+   StreamFind — where-to-watch lookup with daily-refreshed recents
+   Data: TMDB API (watch-provider data by JustWatch)
+============================================================= */
+
+const LS = {
+  key:    'sf_tmdb_key',
+  demo:   'sf_demo_mode',
+  region: 'sf_region',
+  size:   'sf_text_size',
+  recents:'sf_recents'
+};
+const IMG = 'https://image.tmdb.org/t/p/';
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const $ = id => document.getElementById(id);
+
+const state = {
+  key: localStorage.getItem(LS.key) || '',
+  demo: localStorage.getItem(LS.demo) === '1',
+  region: localStorage.getItem(LS.region) || 'US',
+  recents: loadRecents()
+};
+
+function loadRecents(){
+  try{ return JSON.parse(localStorage.getItem(LS.recents)) || []; }
+  catch(e){ return []; }
+}
+function saveRecents(){ localStorage.setItem(LS.recents, JSON.stringify(state.recents)); }
+
+/* ---------------- demo catalog ---------------- */
+const DEMO = [
+  { id:1, type:'tv',    title:'Stranger Things', year:'2016', poster:null, emoji:'🚲',
+    flatrate:[{name:'Netflix'}], ads:[], rent:[], buy:[{name:'Apple TV'},{name:'Amazon Video'}] },
+  { id:2, type:'tv',    title:'The Office', year:'2005', poster:null, emoji:'📎',
+    flatrate:[{name:'Peacock'}], ads:[{name:'Peacock (Free)'}], rent:[], buy:[{name:'Apple TV'}] },
+  { id:3, type:'movie', title:'Top Gun: Maverick', year:'2022', poster:null, emoji:'✈️',
+    flatrate:[{name:'Paramount+'}], ads:[], rent:[{name:'Amazon Video'},{name:'Apple TV'}], buy:[{name:'Amazon Video'}] },
+  { id:4, type:'tv',    title:'Ted Lasso', year:'2020', poster:null, emoji:'⚽',
+    flatrate:[{name:'Apple TV+'}], ads:[], rent:[], buy:[] },
+  { id:5, type:'movie', title:'The Dark Knight', year:'2008', poster:null, emoji:'🦇',
+    flatrate:[{name:'Max'}], ads:[], rent:[{name:'Amazon Video'}], buy:[{name:'Apple TV'}] },
+  { id:6, type:'tv',    title:'Bluey', year:'2018', poster:null, emoji:'🐶',
+    flatrate:[{name:'Disney+'}], ads:[], rent:[], buy:[] },
+  { id:7, type:'movie', title:'Oppenheimer', year:'2023', poster:null, emoji:'💥',
+    flatrate:[{name:'Peacock'}], ads:[], rent:[{name:'Amazon Video'},{name:'Apple TV'}], buy:[{name:'Amazon Video'}] },
+  { id:8, type:'tv',    title:'Severance', year:'2022', poster:null, emoji:'🖥️',
+    flatrate:[{name:'Apple TV+'}], ads:[], rent:[], buy:[] },
+  { id:9, type:'movie', title:'Barbie', year:'2023', poster:null, emoji:'💖',
+    flatrate:[{name:'Max'}], ads:[], rent:[{name:'Amazon Video'}], buy:[{name:'Apple TV'}] },
+  { id:10, type:'tv',   title:'Yellowstone', year:'2018', poster:null, emoji:'🤠',
+    flatrate:[{name:'Peacock'}], ads:[], rent:[], buy:[{name:'Amazon Video'}] }
+];
+
+/* ---------------- API layer ---------------- */
+async function apiSearch(query){
+  if (state.demo){
+    const q = query.toLowerCase();
+    return DEMO.filter(d => d.title.toLowerCase().includes(q))
+               .map(d => ({ id:d.id, media_type:d.type, title:d.title, year:d.year, poster:d.poster, emoji:d.emoji }));
+  }
+  const url = `https://api.themoviedb.org/3/search/multi?api_key=${encodeURIComponent(state.key)}&query=${encodeURIComponent(query)}&include_adult=false&language=en-US&page=1`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('search failed: ' + res.status);
+  const data = await res.json();
+  return (data.results || [])
+    .filter(r => r.media_type === 'movie' || r.media_type === 'tv')
+    .slice(0, 8)
+    .map(r => ({
+      id: r.id,
+      media_type: r.media_type,
+      title: r.media_type === 'movie' ? r.title : r.name,
+      year: ((r.media_type === 'movie' ? r.release_date : r.first_air_date) || '').slice(0, 4),
+      poster: r.poster_path,
+      emoji: r.media_type === 'tv' ? '📺' : '🎬'
+    }));
+}
+
+async function apiProviders(mediaType, id){
+  if (state.demo){
+    const d = DEMO.find(x => x.id === id && x.type === mediaType);
+    return d ? { flatrate:d.flatrate, ads:d.ads, rent:d.rent, buy:d.buy } : { flatrate:[], ads:[], rent:[], buy:[] };
+  }
+  const url = `https://api.themoviedb.org/3/${mediaType}/${id}/watch/providers?api_key=${encodeURIComponent(state.key)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('providers failed: ' + res.status);
+  const data = await res.json();
+  const r = (data.results || {})[state.region] || {};
+  const map = list => (list || []).map(p => ({ name: p.provider_name, logo: p.logo_path }));
+  return { flatrate: map(r.flatrate), ads: map(r.ads), rent: map(r.rent), buy: map(r.buy) };
+}
+
+/* ---------------- views ---------------- */
+function show(view){
+  $('setupView').classList.toggle('hidden', view !== 'setup');
+  $('settingsView').classList.toggle('hidden', view !== 'settings');
+  $('mainView').classList.toggle('hidden', view !== 'main');
+}
+function configured(){ return state.demo || !!state.key; }
+
+function toast(msg){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* ---------------- text size ---------------- */
+const SIZES = ['std', 'large', 'xl'];
+function applySize(size){
+  document.documentElement.classList.remove('size-large', 'size-xl');
+  if (size === 'large') document.documentElement.classList.add('size-large');
+  if (size === 'xl')    document.documentElement.classList.add('size-xl');
+  localStorage.setItem(LS.size, size);
+  document.querySelectorAll('#sizeSeg button').forEach(b =>
+    b.classList.toggle('on', b.dataset.size === size));
+}
+$('sizeBtn').addEventListener('click', () => {
+  const cur = localStorage.getItem(LS.size) || 'std';
+  const next = SIZES[(SIZES.indexOf(cur) + 1) % SIZES.length];
+  applySize(next);
+  toast('Text size: ' + ({std:'Standard', large:'Large', xl:'Extra Large'})[next]);
+});
+document.querySelectorAll('#sizeSeg button').forEach(b =>
+  b.addEventListener('click', () => applySize(b.dataset.size)));
+
+/* ---------------- search + suggestions ---------------- */
+let sugTimer = null, sugSeq = 0;
+
+$('searchInput').addEventListener('input', () => {
+  const q = $('searchInput').value.trim();
+  $('searchBox').classList.toggle('has-text', q.length > 0);
+  clearTimeout(sugTimer);
+  if (q.length < 2){ closeSuggestions(); return; }
+  sugTimer = setTimeout(() => runSuggest(q), 280);
+});
+$('clearBtn').addEventListener('click', () => {
+  $('searchInput').value = '';
+  $('searchBox').classList.remove('has-text');
+  closeSuggestions();
+  $('searchInput').focus();
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('.search-wrap')) closeSuggestions();
+});
+
+async function runSuggest(q){
+  const seq = ++sugSeq;
+  try{
+    const results = await apiSearch(q);
+    if (seq !== sugSeq) return;               // stale response
+    renderSuggestions(results);
+  }catch(err){
+    if (seq !== sugSeq) return;
+    closeSuggestions();
+    toast('Search failed — check your connection or API key.');
+  }
+}
+
+function closeSuggestions(){ $('suggestions').classList.remove('open'); $('suggestions').innerHTML = ''; }
+
+function renderSuggestions(results){
+  const box = $('suggestions');
+  box.innerHTML = '';
+  if (!results.length){
+    box.innerHTML = '<div class="sug" style="color:var(--ink-2)">No matches found</div>';
+    box.classList.add('open');
+    return;
+  }
+  results.forEach(r => {
+    const btn = document.createElement('button');
+    btn.className = 'sug';
+    btn.setAttribute('role', 'option');
+    btn.innerHTML = `
+      ${r.poster
+        ? `<img src="${IMG}w92${r.poster}" alt="" loading="lazy">`
+        : `<div class="noposter">${r.emoji || '🎬'}</div>`}
+      <div class="s-main">
+        <div class="s-title">${esc(r.title)}</div>
+        <div class="s-sub">${r.year || '—'}</div>
+      </div>
+      <span class="badge ${r.media_type}">${r.media_type === 'tv' ? 'TV Show' : 'Movie'}</span>`;
+    btn.addEventListener('click', () => selectTitle(r));
+    box.appendChild(btn);
+  });
+  box.classList.add('open');
+}
+
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+
+/* ---------------- select a title ---------------- */
+async function selectTitle(r){
+  closeSuggestions();
+  $('searchInput').value = '';
+  $('searchBox').classList.remove('has-text');
+
+  const card = $('resultCard');
+  card.classList.add('open');
+  card.innerHTML = '<div style="padding:30px 0"><div class="spinner"></div></div>';
+  card.scrollIntoView({ behavior:'smooth', block:'nearest' });
+
+  try{
+    const prov = await apiProviders(r.media_type, r.id);
+    renderResult(r, prov);
+    addRecent(r, prov);
+  }catch(err){
+    card.innerHTML = '<p style="color:var(--ink-2); text-align:center; padding:14px 0;">Couldn’t load streaming info. Please try again.</p>';
+  }
+}
+
+function providerChips(list, secondary){
+  return list.map(p => `
+    <div class="prov${secondary ? ' secondary' : ''}">
+      ${p.logo ? `<img src="${IMG}w92${p.logo}" alt="">` : ''}
+      <span>${esc(p.name)}</span>
+    </div>`).join('');
+}
+
+function renderResult(r, prov){
+  const streaming = [...prov.flatrate, ...prov.ads];
+  const streamingNames = dedupe(streaming.map(p => p.name));
+  const streamingList = dedupeBy(streaming, p => p.name);
+  const isOn = streamingList.length > 0;
+
+  let groups = '';
+  if (isOn){
+    groups += `<div class="prov-group">
+      <div class="prov-label">▶ Streaming now on</div>
+      <div class="prov-row">${providerChips(streamingList, false)}</div>
+    </div>`;
+  }
+  if (prov.rent.length || prov.buy.length){
+    const rb = dedupeBy([...prov.rent, ...prov.buy], p => p.name);
+    groups += `<div class="prov-group">
+      <div class="prov-label">Rent or buy</div>
+      <div class="prov-row">${providerChips(rb, true)}</div>
+    </div>`;
+  }
+  if (!groups){
+    groups = '<div class="prov-group"><p style="color:var(--ink-2)">No streaming, rental, or purchase options found in your region right now.</p></div>';
+  }
+
+  $('resultCard').innerHTML = `
+    <button class="r-close" aria-label="Close result" onclick="document.getElementById('resultCard').classList.remove('open')">✕</button>
+    <div class="r-top">
+      ${r.poster
+        ? `<img class="r-poster" src="${IMG}w342${r.poster}" alt="">`
+        : `<div class="r-poster" style="display:grid;place-items:center;font-size:2rem;">${r.emoji || '🎬'}</div>`}
+      <div class="r-info">
+        <div class="r-title">${esc(r.title)}</div>
+        <div class="r-meta">${r.media_type === 'tv' ? 'TV Show' : 'Movie'}${r.year ? ' · ' + r.year : ''}</div>
+        <div class="status-pill ${isOn ? 'yes' : 'no'}">
+          <span class="dot"></span>${isOn ? 'Streaming on ' + esc(streamingNames.join(', ')) : 'Not on a streaming service'}
+        </div>
+      </div>
+    </div>
+    ${groups}
+    <div class="attrib">Availability data by JustWatch via TMDB · Region: ${esc(state.region)}</div>`;
+}
+
+function dedupe(arr){ return [...new Set(arr)]; }
+function dedupeBy(arr, keyFn){
+  const seen = new Set(); const out = [];
+  for (const x of arr){ const k = keyFn(x); if (!seen.has(k)){ seen.add(k); out.push(x); } }
+  return out;
+}
+
+/* ---------------- recents ---------------- */
+function addRecent(r, prov){
+  state.recents = state.recents.filter(x => !(x.id === r.id && x.media_type === r.media_type));
+  state.recents.unshift({
+    id: r.id, media_type: r.media_type, title: r.title, year: r.year,
+    poster: r.poster, emoji: r.emoji,
+    providers: prov, checked: Date.now()
+  });
+  if (state.recents.length > 50) state.recents.length = 50;
+  saveRecents();
+  renderRecents();
+}
+
+function removeRecent(id, mediaType){
+  state.recents = state.recents.filter(x => !(x.id === id && x.media_type === mediaType));
+  saveRecents();
+  renderRecents();
+  toast('Removed from recents');
+}
+
+$('clearRecents').addEventListener('click', () => {
+  state.recents = [];
+  saveRecents();
+  renderRecents();
+  toast('Recents cleared');
+});
+
+function agoLabel(ts){
+  const d = Date.now() - ts;
+  if (d < 60000) return 'checked just now';
+  if (d < 3600000) return 'checked ' + Math.round(d / 60000) + ' min ago';
+  if (d < DAY_MS) return 'checked ' + Math.round(d / 3600000) + ' hr ago';
+  return 'checked ' + Math.round(d / DAY_MS) + ' day(s) ago';
+}
+
+function renderRecents(){
+  const list = $('recentsList');
+  $('recentsCount').textContent = state.recents.length;
+  $('recentsEmpty').classList.toggle('hidden', state.recents.length > 0);
+  list.innerHTML = '';
+
+  state.recents.forEach(item => {
+    const streaming = dedupeBy([...(item.providers.flatrate || []), ...(item.providers.ads || [])], p => p.name);
+    const isOn = streaming.length > 0;
+
+    const row = document.createElement('div');
+    row.className = 'recent';
+
+    const open = document.createElement('button');
+    open.style.cssText = 'all:unset;display:flex;gap:14px;align-items:center;flex:1;min-width:0;cursor:pointer;';
+    open.setAttribute('aria-label', 'Open ' + item.title);
+    open.innerHTML = `
+      ${item.poster
+        ? `<img class="poster" src="${IMG}w154${item.poster}" alt="" loading="lazy">`
+        : `<div class="noposter">${item.emoji || '🎬'}</div>`}
+      <div class="rc-main">
+        <div class="rc-title">${esc(item.title)}</div>
+        <div class="rc-status ${isOn ? 'yes' : 'no'}">
+          <span class="dot"></span>
+          <span>${isOn ? esc(streaming.map(p => p.name).join(', ')) : 'Not currently streaming'}</span>
+        </div>
+        <div class="rc-logos">
+          ${streaming.slice(0, 4).map(p => p.logo ? `<img src="${IMG}w92${p.logo}" alt="${esc(p.name)}">` : '').join('')}
+          ${streaming.length > 4 ? `<span class="more">+${streaming.length - 4}</span>` : ''}
+        </div>
+        <div class="rc-checked">${agoLabel(item.checked)}</div>
+      </div>`;
+    open.addEventListener('click', () => {
+      selectTitle(item);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    const del = document.createElement('button');
+    del.className = 'rc-del';
+    del.setAttribute('aria-label', 'Remove ' + item.title + ' from recents');
+    del.innerHTML = '🗑';
+    del.addEventListener('click', () => removeRecent(item.id, item.media_type));
+
+    row.appendChild(open);
+    row.appendChild(del);
+    list.appendChild(row);
+  });
+}
+
+/* ---- daily refresh: re-check anything older than 24 h ---- */
+async function refreshStale(){
+  const stale = state.recents.filter(x => Date.now() - x.checked > DAY_MS);
+  if (!stale.length) return;
+  toast('Updating streaming info…');
+  let changed = 0;
+  for (const item of stale){
+    try{
+      const prov = await apiProviders(item.media_type, item.id);
+      const before = JSON.stringify([...(item.providers.flatrate||[]), ...(item.providers.ads||[])].map(p=>p.name).sort());
+      const after  = JSON.stringify([...(prov.flatrate||[]), ...(prov.ads||[])].map(p=>p.name).sort());
+      if (before !== after) changed++;
+      item.providers = prov;
+      item.checked = Date.now();
+      await new Promise(r => setTimeout(r, 250));   // gentle on the API
+    }catch(e){ /* keep old data, retry next open */ }
+  }
+  saveRecents();
+  renderRecents();
+  toast(changed ? `Updated — ${changed} title(s) changed services` : 'All recents up to date ✓');
+}
+
+/* ---------------- setup & settings ---------------- */
+$('setupSave').addEventListener('click', () => {
+  const k = $('setupKey').value.trim();
+  if (!k){ toast('Paste your TMDB API key first (or use Demo Mode)'); return; }
+  state.key = k; state.demo = false;
+  localStorage.setItem(LS.key, k);
+  localStorage.setItem(LS.demo, '0');
+  enterMain();
+});
+$('setupDemo').addEventListener('click', () => {
+  state.demo = true;
+  localStorage.setItem(LS.demo, '1');
+  enterMain();
+  toast('Demo mode — sample catalog only');
+});
+
+$('settingsBtn').addEventListener('click', () => {
+  if (!configured()) return;
+  $('settingsKey').value = state.key;
+  $('regionSel').value = state.region;
+  show('settings');
+});
+$('settingsClose').addEventListener('click', () => show(configured() ? 'main' : 'setup'));
+$('settingsSave').addEventListener('click', () => {
+  const k = $('settingsKey').value.trim();
+  state.key = k;
+  state.demo = !k;
+  state.region = $('regionSel').value;
+  localStorage.setItem(LS.key, k);
+  localStorage.setItem(LS.demo, state.demo ? '1' : '0');
+  localStorage.setItem(LS.region, state.region);
+  $('regionTag').textContent = 'Where to watch · ' + state.region + (state.demo ? ' · demo' : '');
+  toast('Settings saved');
+  show('main');
+});
+
+function enterMain(){
+  $('regionTag').textContent = 'Where to watch · ' + state.region + (state.demo ? ' · demo' : '');
+  show('main');
+  renderRecents();
+  refreshStale();
+}
+
+/* ---------------- boot ---------------- */
+applySize(localStorage.getItem(LS.size) || 'std');
+if (configured()) enterMain(); else show('setup');
+</script>
+</body>
+</html>
